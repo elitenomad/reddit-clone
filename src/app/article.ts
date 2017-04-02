@@ -1,16 +1,36 @@
+interface ArticleJSON{
+  title: string
+  description: string
+  urlToImage: string
+  votes: number
+  author: string
+  publishedAt: string
+}
+
 export class Article {
-  public title: string;
-  public description: string;
-  public votes?: number;
+
 
   public publishedAt: Date;
 
-  constructor(aTitle: string, aDescription: string, aVotes?: number) {
-    this.title = aTitle;
-    this.description = aDescription;
-    this.votes = aVotes || 0;
-    this.publishedAt = new Date();
+  // Article.fromJSON()
+  static fromJSON(json: ArticleJSON): Article {
+    let article = Object.create(Article.prototype);
+    return Object.assign(article, json, {
+      votes: json.votes ? json.votes : 0,
+      publishedAt: json.publishedAt ? new Date(json.publishedAt) : new Date()
+    });
   }
+
+
+  constructor(
+    public title: string,
+    public description: string,
+    public urlToImage?: string,
+    public votes?: number) {
+      this.votes = votes || 1000;
+      this.publishedAt = new Date();
+  }
+
 
   public voteUp(): void {
     this.votes = this.votes + 1;
