@@ -46,24 +46,33 @@ const sortFns = {
 @Injectable()
 export class ArticleService {
   private _articles: BehaviorSubject<Article[]> = new BehaviorSubject<Article[]>([]);
+  private _sources: BehaviorSubject<any> = new BehaviorSubject<any>([]);
+
+
   private _sortByDirectionSubject:
     BehaviorSubject<number> = new BehaviorSubject<number>(1);
   private _sortByFilterSubject:
     BehaviorSubject<ArticleSortOrderFn> = new BehaviorSubject<ArticleSortOrderFn>(sortByTime);
 
+  private _filterBySubject:
+    BehaviorSubject<string> = new BehaviorSubject<string>('');
 
   public articles: Observable<Article[]> = this._articles.asObservable();
   public orderedArticles: Observable<Article[]>;
+  public sources: Observable<any> = this._sources.asObservable();
 
   constructor(private http: Http) {
     this.orderedArticles = Observable.combineLatest(
       this._articles,
       this._sortByFilterSubject,
-      this._sortByDirectionSubject
+      this._sortByDirectionSubject,
+      this._filterBySubject
     ).map(([
-      articles, sorter, direction
+      articles, sorter, direction, filterStr
     ]) => {
+      const re = new RegExp(filterStr, 'gi');
       return articles
+        .filter(a => re.exec(a.title))
         .sort(sorter(direction));
     })
   }
@@ -71,11 +80,13 @@ export class ArticleService {
 
   private _makeHttpRequest(
     path: string,
-    sourceKey: string
+    sourceKey?: string
   ): Observable<any> {
     let params = new URLSearchParams();
     params.set('apiKey', environment.newsApiKey);
-    params.set('source', sourceKey);
+    if(sourceKey && sourceKey !== ''){
+      params.set('source', sourceKey);
+    }
 
     return this.http
                .get(`${environment.baseUrl}${path}`,{search: params})
@@ -96,9 +107,33 @@ export class ArticleService {
 
   }
 
+  public updateArticles(sourceKey = 'reddit-r-all'): void {
+    this._makeHttpRequest('v1/articles', sourceKey)
+      .map(json => json.articles)
+      .subscribe(articlesJSON => {
+        const articles = articlesJSON
+          .map(artcilejson => Article.fromJSON(artcilejson));
+        this._articles.next(articles);
+      })
+
+  }
+
+
+
   public sortBy(filter: string, direction: number): void {
     this._sortByDirectionSubject.next(direction);
     this._sortByFilterSubject.next(sortFns[filter]);
+  }
+
+  public filterBy(filter: string){
+      this._filterBySubject.next(filter);
+  }
+
+  public getSources(): void {
+      this._makeHttpRequest('/v1/sources')
+        .map(json => json.sources)
+        .filter(list => list.length > 0)
+        .subscribe(this._sources);
   }
 
 }
